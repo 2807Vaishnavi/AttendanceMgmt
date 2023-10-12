@@ -28,7 +28,6 @@ page 50106 "Marksheet List"
                     trigger OnLookup(var Text: Text): Boolean
                     var
                         Rec_Student: Record Students;
-                        PageStudent: page Students;
                     begin
                         Rec_Student.Reset();
                         if Page.RunModal(Page::Students, Rec_Student) = Action::LookupOK then begin
@@ -82,7 +81,46 @@ page 50106 "Marksheet List"
                 field(Percentage; Rec.Percentage)
                 {
                     ApplicationArea = All;
+                    trigger OnValidate()
+                    begin
+                        if (Rec.Percentage > 90) and (Rec.Percentage < 100) then rec.Grade := 'A+';
+                        if (Rec.Percentage < 90) and (Rec.Percentage > 80) then rec.Grade := 'A';
+                        if (Rec.Percentage < 80) and (Rec.Percentage > 70) then rec.Grade := 'B+';
+                        if (Rec.Percentage < 70) and (Rec.Percentage > 60) then rec.Grade := 'B';
+                        if (Rec.Percentage < 60) and (Rec.Percentage > 50) then rec.Grade := 'C+';
+                        if (Rec.Percentage < 50) and (Rec.Percentage > 40) then rec.Grade := 'C';
+
+                    end;
                 }
+
+            }
+
+        }
+
+    }
+    actions
+    {
+        area(Processing)
+        {
+            action(AttendanceList)
+            {
+                Caption = 'Attendance List';
+                ApplicationArea = All;
+                Image = Document;
+                RunObject = Page Attendance;
+                RunPageLink = "Student ID" = field("Student ID"), "Student Name" = field("Student Name"); // you can use this feature for opening Attendance Page.
+                trigger OnAction()
+                var
+                    PageAttendance: Page Attendance;
+                    Rec_Attendance: Record Attendances;
+                begin
+                    //Alternate way to open a new page using the action 
+                    Clear(Rec_Attendance);
+                    Clear(PageAttendance);
+                    Rec_Attendance.SetRange("Student ID", Rec."Student ID");
+                    PageAttendance.SetTableView(Rec_Attendance);
+                    PageAttendance.Run();
+                end;
 
             }
         }
@@ -100,13 +138,26 @@ page 50106 "Marksheet List"
 
         if Rec_GenLedeSetup."Marksheet No Series" = '' then Error('Kindly assign Marksheet No series in General Ledger Setup');// To check if the Marksheet No series contains a value or not and throw a error
 
-        Rec."Marksheet No" := Cu_Numberseries.DoGetNextNo(Rec_GenLedeSetup."Marksheet No Series", Today, true, true);
-        Rec."Academic Year" := 'SY-' + Format(System.Date2DMY(Today, 3));
+        Rec.Validate("Marksheet No", Cu_Numberseries.DoGetNextNo(Rec_GenLedeSetup."Marksheet No Series", Today, true, true));
+        Rec.Validate("Academic Year", 'SY-' + Format(System.Date2DMY(Today, 3)));
         StartDate := CalcDate('-CY', Today);
         EndDate := CalcDate('CY', Today);
-        Rec.Insert();
     end;
 
- 
+    trigger OnModifyRecord(): Boolean
+    var
+        CountN: Integer;
+        TotalmarksObtaine: Decimal;
+    begin
+        Clear(CountN);
+        if (xRec."Subject 1" <> Rec."Subject 1") or (xRec."Subject 2" <> Rec."Subject 2") or (xRec."Subject 3" <> Rec."Subject 3") or (xRec."Subject 4" <> Rec."Subject 4") then begin
+            if Rec."Subject 1" <> 0 then CountN := 100 + CountN;
+            if Rec."Subject 2" <> 0 then CountN += 100;
+            if Rec."Subject 3" <> 0 then CountN += 100;
+            if Rec."Subject 4" <> 0 then CountN += 100;
+            Rec.Validate(Percentage, ((Rec."Subject 1" + Rec."Subject 2" + Rec."Subject 3" + Rec."Subject 4") / CountN) * 100);
+
+        end;
+    end;
 
 }
